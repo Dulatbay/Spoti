@@ -3,6 +3,7 @@ import axios from 'axios';
 import {debounce} from 'lodash';
 import {spotifyProxy, spotifySearch} from "../services/spotifyService.ts";
 import TrackCard from "./TrackCard.tsx";
+import {useNavigate} from "react-router-dom";
 
 export interface Artist {
     name: string;
@@ -13,7 +14,7 @@ export interface AlbumImage {
 }
 
 export type Track = {
-    type: "TRACK";
+    type: "track";
     id: string;
     name: string;
     preview_url: string;
@@ -80,7 +81,7 @@ const SearchInput: React.FC = () => {
     const [query, setQuery] = useState<string>('kendrik');
     const [results, setResults] = useState<SearchResults | null>(null);
     const [loading, setLoading] = useState<boolean>(false);
-
+    const navigate = useNavigate()
     const abortControllerRef = useRef<AbortController | null>(null);
 
     // Fetch search results
@@ -134,13 +135,12 @@ const SearchInput: React.FC = () => {
             return;
         }
 
-        const response = await spotifyProxy(url);
-
-        if (item.type === "TRACK") {
+        console.log(item);
+        if (item.type === "track") {
             // Handle track click
             console.log('Track clicked:', item);
         } else {
-
+            navigate("/albums?q=" + url);
         }
     };
 
@@ -204,30 +204,30 @@ const SearchInput: React.FC = () => {
                         )}
 
                         {/* Render Playlists */}
-                        {results.playlists?.items.length > 0 && (
-                            <div>
-                                <h2 className="text-lg font-bold">Playlists</h2>
-                                <div className="grid grid-cols sm:grid-cols-3 md:grid-cols-4 gap-4">
-                                    {results.playlists.items
-                                        .filter((item: Playlist) => item)
-                                        .map((item: Playlist) => (
-                                            <div
-                                                key={item.id}
-                                                className="p-4 rounded-lg hover:bg-zinc-800 cursor-pointer"
-                                                onClick={() => handleClick(item)}
-                                            >
-                                                <img
-                                                    src={item?.images[0]?.url}
-                                                    alt={item?.name}
-                                                    className="object-cover rounded-md mb-2"
-                                                />
-                                                <h3 className="text-sm">{item?.name}</h3>
-                                                <p className="text-xs text-gray-400">{item?.owner?.display_name}</p>
-                                            </div>
-                                        ))}
-                                </div>
-                            </div>
-                        )}
+                        {/*{results.playlists?.items.length > 0 && (*/}
+                        {/*    <div>*/}
+                        {/*        <h2 className="text-lg font-bold">Playlists</h2>*/}
+                        {/*        <div className="grid grid-cols sm:grid-cols-3 md:grid-cols-4 gap-4">*/}
+                        {/*            {results.playlists.items*/}
+                        {/*                .filter((item: Playlist) => item)*/}
+                        {/*                .map((item: Playlist) => (*/}
+                        {/*                    <div*/}
+                        {/*                        key={item.id}*/}
+                        {/*                        className="p-4 rounded-lg hover:bg-zinc-800 cursor-pointer"*/}
+                        {/*                        onClick={() => handleClick(item)}*/}
+                        {/*                    >*/}
+                        {/*                        <img*/}
+                        {/*                            src={item?.images[0]?.url}*/}
+                        {/*                            alt={item?.name}*/}
+                        {/*                            className="object-cover rounded-md mb-2"*/}
+                        {/*                        />*/}
+                        {/*                        <h3 className="text-sm">{item?.name}</h3>*/}
+                        {/*                        <p className="text-xs text-gray-400">{item?.owner?.display_name}</p>*/}
+                        {/*                    </div>*/}
+                        {/*                ))}*/}
+                        {/*        </div>*/}
+                        {/*    </div>*/}
+                        {/*)}*/}
 
                     </div>
 

@@ -1,14 +1,21 @@
 import {Track} from "./SearchInput.tsx";
+import {useNavigate} from "react-router-dom";
 
 const TrackCard: React.FC<{ track: Track }> = ({ track }) => {
+    const navigate = useNavigate();
+
     const formatDuration = (duration: number) => {
         const minutes = Math.floor(duration / 60000);
         const seconds = ((duration % 60000) / 1000).toFixed(0);
         return `${minutes}:${seconds.padStart(2, '0')}`;
     };
 
+    const handleClick = () => {
+        navigate(`/player/${track.id}`);
+    };
+
     return (
-        <div className="p-4 bg-[#282828] rounded-lg hover:bg-zinc-700 cursor-pointer flex flex-col sm:flex-row sm:space-x-4 sm:space-y-0 space-y-2">
+        <div className="p-4 bg-[#282828] rounded-lg hover:bg-zinc-700 cursor-pointer flex flex-col sm:flex-row sm:space-x-4 sm:space-y-0 space-y-2" onClick={handleClick} >
             {/* Album Image */}
             <img
                 src={track.album.images[0]?.url}
