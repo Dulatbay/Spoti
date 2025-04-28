@@ -63,4 +63,30 @@ const searchSpotify = async (req: Request, res: Response): Promise<void> => {
     }
 };
 
-export { searchSpotify };
+const proxySpotify = async (req: Request, res: Response): Promise<void> => {
+    const { query } = req.query; // Query params from frontend
+
+    if (!query) {
+        res.status(400).json({ error: 'Query is required' });
+        return
+    }
+
+    if (isTokenExpired()) {
+        await fetchAccessToken();
+    }
+
+    console.log(`Proxying request to Spotify API: ${query}`);
+    try {
+        const response = await axios.get(`https://api.spotify.com/v1/${query}`, {
+            headers: {
+                Authorization: `Bearer ${accessToken}`,
+            },
+        });
+        res.json(response.data);
+    } catch (error) {
+        console.error('Error searching Spotify:', error);
+        res.status(500).json({ error: 'Failed to search Spotify' });
+    }
+}
+
+export { searchSpotify,proxySpotify };

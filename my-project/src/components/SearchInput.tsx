@@ -1,72 +1,104 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import axios from 'axios';
-import { debounce } from 'lodash';
+import {debounce} from 'lodash';
+import {spotifyProxy, spotifySearch} from "../services/spotifyService.ts";
+import TrackCard from "./TrackCard.tsx";
 
-interface Artist {
+export interface Artist {
     name: string;
 }
 
-interface AlbumImage {
+export interface AlbumImage {
     url: string;
 }
 
-interface Album {
+export type Track = {
+    type: "TRACK";
+    id: string;
+    name: string;
+    preview_url: string;
+    artists: Artist[];
+    album: {
+        name: string;
+        images: AlbumImage[];
+    };
+    href: string;
+    duration_ms: number;
+    release_date: string;
+}
+
+export type Playlist = {
+    type: "PLAYLIST";
+    id: string;
+    name: string;
+    images: AlbumImage[];
+    owner: {
+        display_name: string;
+    };
+    external_urls: {
+        spotify: string;
+    };
+    href: string;
+}
+
+export type Album = {
+    type: "ALBUM";
     id: string;
     name: string;
     images: AlbumImage[];
     artists: Artist[];
     release_date: string;
-    preview_url: string;  // To play the preview
+    preview_url: string;
+    href: string;
 }
 
 interface SearchResults {
+    tracks: {
+        items: Track[];
+    };
     albums: {
         items: Album[];
     };
+    playlists: {
+        items: Playlist[];
+    };
 }
 
+const getUrl = (href: string) => {
+    const regex = /v1\/(.*)/; // Matches everything after 'v1/'
+
+    const match = href.match(regex);
+
+    if (match) {
+        return match[1];
+    } else {
+        return null
+    }
+}
 
 const SearchInput: React.FC = () => {
-    const [query, setQuery] = useState<string>('');
+    const [query, setQuery] = useState<string>('kendrik');
     const [results, setResults] = useState<SearchResults | null>(null);
     const [loading, setLoading] = useState<boolean>(false);
-    const [page, setPage] = useState<number>(1);
-    const [hoveredAlbum, setHoveredAlbum] = useState<Album | null>(null); // To track hovered album
 
-    const observer = useRef<IntersectionObserver | null>(null); // Ref to handle infinite scroll
-    const abortControllerRef = useRef<AbortController | null>(null); // Ref to cancel previous requests
+    const abortControllerRef = useRef<AbortController | null>(null);
 
     // Fetch search results
-    const fetchResults = async (query: string, page: number) => {
+    const fetchResults = async (query: string) => {
         try {
             setLoading(true);
             if (abortControllerRef.current) {
-                abortControllerRef.current.abort(); // Cancel the previous request if it's still ongoing
+                abortControllerRef.current.abort();
             }
 
-            const controller = new AbortController();
-            abortControllerRef.current = controller; // Store the controller for future requests
+            const response = await spotifySearch(query);
 
-            const response = await axios.get('http://localhost:3000/api/spotify/search', {
-                params: { query, limit: 10, offset: (page - 1) * 10 },
-                signal: controller.signal, // Pass the abort signal to axios
-            });
 
-            if (page === 1) {
-                setResults(response.data); // Replace results with new search
-            } else {
-                setResults((prevResults) => ({
-                    ...prevResults,
-                    albums: {
-                        // @ts-ignore
-                        items: [...prevResults.albums.items, ...response.data.albums.items], // Append new items
-                    },
-                }));
-            }
+            setResults(response.data);
             setLoading(false);
         } catch (error) {
             if (axios.isCancel(error)) {
-                console.log('Request canceled', error.message); // Ignore the canceled requests
+                console.log('Request canceled', error.message);
             } else {
                 console.error('Error fetching search results:', error);
                 setLoading(false);
@@ -74,13 +106,15 @@ const SearchInput: React.FC = () => {
         }
     };
 
-    // Debounced search handler
-    const handleSearch = debounce((query: string) => {
-        if (query) {
-            setPage(1); // Reset to page 1 when a new search query is entered
-            fetchResults(query, 1); // Fetch the first page
-        }
-    }, 3000); // Wait for 3 seconds after user stops typing
+    // Create a debounced function using useCallback
+    const handleSearch = useCallback(
+        debounce((query: string) => {
+            if (query) {
+                fetchResults(query); // Fetch the first page
+            }
+        }, 3000), // Debounce delay of 3 seconds
+        [] // Empty dependency array ensures debounce function is created once
+    );
 
     // Effect to handle query changes
     useEffect(() => {
@@ -91,53 +125,25 @@ const SearchInput: React.FC = () => {
         }
     }, [query]);
 
-    // Infinite scroll logic
-    useEffect(() => {
-        const loadMore = () => {
-            if (loading) return; // Prevent multiple triggers if loading is true
-            setPage((prevPage) => prevPage + 1); // Increment page when scrolled to the bottom
-        };
 
-        const options = {
-            root: null,
-            rootMargin: '0px',
-            threshold: 1.0,
-        };
+    const handleClick = async (item: Track | Album | Playlist) => {
+        const url = getUrl(item.href);
 
-        observer.current = new IntersectionObserver(([entry]) => {
-            if (entry.isIntersecting) {
-                loadMore();
-            }
-        }, options);
-
-        const lastElement = document.querySelector('#load-more');
-        if (lastElement && observer.current) {
-            observer.current.observe(lastElement);
+        if (!url) {
+            alert('Invalid URL');
+            return;
         }
 
-        return () => {
-            if (observer.current && lastElement) {
-                observer.current.unobserve(lastElement);
-            }
-        };
-    }, [loading]);
+        const response = await spotifyProxy(url);
 
-    useEffect(() => {
-        if (query && page > 1) {
-            fetchResults(query, page); // Fetch more results on scroll
+        if (item.type === "TRACK") {
+            // Handle track click
+            console.log('Track clicked:', item);
+        } else {
+
         }
-    }, [page, query]);
-
-
-    // Hover album to play music
-    const handleHover = (album: Album) => {
-        setHoveredAlbum(album);
     };
 
-    const handleClick = (album: Album) => {
-        // Handle album click (show more details or navigate)
-        alert(`You clicked on album: ${album.name}`);
-    };
     return (
         <div className="dark:text-white p-6 max-w-[1200px] mx-auto">
             <input
@@ -152,43 +158,79 @@ const SearchInput: React.FC = () => {
 
             {results && (
                 <div className="mt-6">
-                    <div className="grid grid-cols sm:grid-cols-3 md:grid-cols-4 gap-4">
-                        {results.albums?.items.map((item: Album) => (
-                            <div
-                                key={item.id}
-                                className="p-4 rounded-lg hover:bg-zinc-800 cursor-pointer"
-                                onClick={() => handleClick(item)}
-                                onMouseEnter={() => handleHover(item)} // Start hover behavior
-                            >
-                                <img
-                                    src={item.images[0]?.url}
-                                    alt={item.name}
-                                    className="object-cover rounded-md mb-2"
-                                />
-                                <h3 className="text-sm">{item.name}</h3>
-                                <p className="text-xs text-gray-400">{item.artists[0]?.name}</p>
-                                {hoveredAlbum?.id === item.id && (
-                                    <audio
-                                        controls
-                                        className="mt-2 w-full"
-                                        autoPlay
-                                        src={item.preview_url}
-                                    >
-                                        Your browser does not support the audio element.
-                                    </audio>
-                                )}
+                    <div className="space-y-6">
+                        {/* Render Tracks */}
+                        {results.tracks?.items.length > 0 && (
+                            <div>
+                                <h2 className="text-lg font-bold">Tracks</h2>
+                                <div className="flex flex-col space-y-2 mt-4">
+                                    {results.tracks.items
+                                        .filter((item: Track) => item)
+                                        .map((item: Track) => (
+                                            <div
+                                                key={item.id}
+                                                onClick={() => handleClick(item)}>
+                                                <TrackCard track={item}/>
+                                            </div>
+                                        ))}
+                                </div>
                             </div>
-                        ))}
+                        )}
+
+                        {/* Render Albums */}
+                        {results.albums?.items.length > 0 && (
+                            <div>
+                                <h2 className="text-lg font-bold">Albums</h2>
+                                <div className="grid grid-cols sm:grid-cols-3 md:grid-cols-4 gap-4">
+                                    {results.albums.items
+                                        .filter((item: Album) => item)
+                                        .map((item: Album) => (
+                                            <div
+                                                key={item.id}
+                                                className="p-4 rounded-lg hover:bg-zinc-800 cursor-pointer"
+                                                onClick={() => handleClick(item)}
+                                            >
+                                                <img
+                                                    src={item.images[0]?.url}
+                                                    alt={item.name}
+                                                    className="object-cover rounded-md mb-2"
+                                                />
+                                                <h3 className="text-sm">{item.name}</h3>
+                                                <p className="text-xs text-gray-400">{item.artists[0]?.name}</p>
+                                            </div>
+                                        ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Render Playlists */}
+                        {results.playlists?.items.length > 0 && (
+                            <div>
+                                <h2 className="text-lg font-bold">Playlists</h2>
+                                <div className="grid grid-cols sm:grid-cols-3 md:grid-cols-4 gap-4">
+                                    {results.playlists.items
+                                        .filter((item: Playlist) => item)
+                                        .map((item: Playlist) => (
+                                            <div
+                                                key={item.id}
+                                                className="p-4 rounded-lg hover:bg-zinc-800 cursor-pointer"
+                                                onClick={() => handleClick(item)}
+                                            >
+                                                <img
+                                                    src={item?.images[0]?.url}
+                                                    alt={item?.name}
+                                                    className="object-cover rounded-md mb-2"
+                                                />
+                                                <h3 className="text-sm">{item?.name}</h3>
+                                                <p className="text-xs text-gray-400">{item?.owner?.display_name}</p>
+                                            </div>
+                                        ))}
+                                </div>
+                            </div>
+                        )}
+
                     </div>
 
-                    {/* "More" button for infinite scroll */}
-                    <div id="load-more" className="text-center mt-4">
-                        {loading ? (
-                            <p>Loading more...</p>
-                        ) : (
-                            <p className="text-sm text-gray-500">Scroll down to load more</p>
-                        )}
-                    </div>
                 </div>
             )}
         </div>
