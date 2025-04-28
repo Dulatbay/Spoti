@@ -1,7 +1,7 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
 import axios from 'axios';
 import {debounce} from 'lodash';
-import {spotifyProxy, spotifySearch} from "../services/spotifyService.ts";
+import {spotifySearch} from "../services/spotifyService.ts";
 import TrackCard from "./TrackCard.tsx";
 import {useNavigate} from "react-router-dom";
 
